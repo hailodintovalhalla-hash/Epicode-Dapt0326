@@ -1,5 +1,5 @@
 -- =============================================================================
--- M3_ESERCITAZIONEFINALE_GOIZA / W8D4 / TOYSGROUP
+-- M3_ESERCITAZIONEFINALE_GOIZA_GABRIELE / W8D4 / TOYSGROUP
 -- =============================================================================
 -- =============================================================================
 -- TASK 1a: Progettazione concettuale
@@ -17,6 +17,7 @@
  3 Gerarchie:
     - Product include Category // un attributo descrittivo di Product.
     - Region include State //  un attributo descrittivo della regione di vendita.
+    
 */
 -- =============================================================================
 -- TASK 1b: Progettazione logica
@@ -51,6 +52,8 @@ CREATE DATABASE ToysGroup;
 -- Tramite il comando "use" indico al software il database da puntare.
 USE ToysGroup;
 
+-- Una volta selezionato il database su cui lavorare, 
+-- tramite il comando create table vado a definire le tabelle con le referenze, le chiavi primarie e i relativi attributi
 
 CREATE TABLE Product (
 	ProductKey INT PRIMARY KEY,
@@ -80,6 +83,13 @@ CREATE TABLE Sales (
 -- =============================================================================
 -- TASK 3: Popolamento dati
 -- =============================================================================
+
+-- Dopo aver accertato la corretta creazione delle tabelle e averne controllato la struttura tramite il comando describe 
+-- procedo a popolare le tabelle
+
+describe product;
+describe region;
+describe sales;
 
 -- 1. Inserimento prodotti (almeno 4 prodotti distribuiti su 2 categorie)
 INSERT INTO Product (ProductKey, ProductName, Category) VALUES
@@ -115,15 +125,21 @@ INSERT INTO Sales (SalesKey, ProductKey, RegionKey, SalesDate, Quantity, SalesAm
 -- TASK 4a: Integrità e JOIN
 -- =============================================================================
 
+-- Verifico il corretto popolamento delle tabelle con i dati campione
+
 SELECT * FROM Sales;
 SELECT * FROM Product;
 SELECT * FROM Region;
 
 -- 1. Verifica dell'univocità della chiave primaria per ciascuna tabella
 
+-- Primo metodo eseguo un conteggio delle chiavi primarie sulle tabelle
+
 SELECT ProductKey, COUNT(*) AS CountPK FROM Product GROUP BY ProductKey HAVING COUNT(*) > 1;
 SELECT RegionKey, COUNT(*) AS CountPK FROM Region GROUP BY RegionKey HAVING COUNT(*) > 1;
 SELECT SalesKey, COUNT(*) AS CountPK FROM Sales GROUP BY SalesKey HAVING COUNT(*) > 1;
+
+-- Secondo metodo eseguo una ricerca sulle colonne che sono identificate come chiavi primarie
 
 SELECT
     TABLE_NAME,
@@ -136,8 +152,8 @@ WHERE TABLE_SCHEMA = 'ToysGroup'
 
 
 -- 2 & 3. INNER JOIN con colonna booleana (più di 180 giorni dalla data vendita).
-
 -- Uso per leggibilitá supponendo di elaborare un report di una filiale in Italia, degli alias in Italiano.
+-- Utilizzo un espressione condizionale per verificare l anzianita dell ordine
 
 SELECT 
     p.ProductKey as CodicePrdotto,
@@ -156,10 +172,9 @@ INNER JOIN Region r ON s.RegionKey = r.RegionKey;
 -- =============================================================================
 -- TASK 4b: Aggregazioni e raggruppamenti
 -- =============================================================================
-
 -- Uso per leggibilitá supponendo di elaborare un report di una filiale in Italia, degli alias in Italiano.
-
 -- 1. Fatturato totale per prodotto e per anno
+
 SELECT 
     ProductKey AS CodiceProdotto,
     YEAR(SalesDate) AS AnnoDiVendita,
@@ -183,7 +198,7 @@ ORDER BY
 
 -- 3. Categoria di prodotto più richiesta dal mercato (misurata come quantità totale venduta)
 
--- Versione 1 agendo limitato ad una sola riga ordinando in ordine descrescente la prima mi da la categoria con maggiori vendita
+-- Versione 1 agisco limitando ad una sola riga la query risultante, ordinando in ordine descrescente la prima mi da la categoria con maggiori vendita
 SELECT 
     p.Category AS Categoria,
     SUM(s.Quantity) AS TotaleQuantitaVenduta
@@ -223,7 +238,6 @@ HAVING SUM(s.Quantity) = (
 -- =============================================================================
 
 -- Uso per leggibilitá supponendo di elaborare un report di una filiale in Italia, degli alias in Italiano.
-
 -- 1. Calcolare la quantità media venduta per prodotto nell'ultimo anno censito
 
 SELECT 
@@ -241,7 +255,6 @@ FROM (
 ) AS SubQueryAvg;
 
 -- 2.Utilizzare la subquery del punto 1 in una condizione WHERE per filtrare i prodotti sopra la media
-
 SELECT 
     ProductKey AS CodiceProdotto,
     SUM(Quantity) AS QuantitaTotale
@@ -257,7 +270,6 @@ HAVING SUM(Quantity) > (
         GROUP BY ProductKey
     ) AS SubQueryMedia
 );
-
 -- 3. Stesso calcolo utilizzando una CTE
 WITH VenditeUltimoAnno AS (
     SELECT 
@@ -283,8 +295,6 @@ WHERE vua.QuantitaTotale > qm.MediaQuantita;
 -- =============================================================================
 
 -- Uso per leggibilitá supponendo di elaborare un report di una filiale in Italia, degli alias in Italiano.
-
-
 -- 1. Classifica prodotto per fatturato totale all'interno della propria categoria
 
 SELECT 
@@ -452,6 +462,13 @@ FROM Sales;
 -- Versione corretta:
 -- Creazione tabella log con colonna di scadenza/retention
 
+CREATE DATABASE utenti;
+
+USE utenti;
+
+-- Creo la tabella definendo un attributo RetentionExpiryDate che calcola la scadenza dei dati
+-- Supponendo a norma di legge che possono essere conservati per esempio per un periodo di 90 giorni
+
 CREATE TABLE ReportAccessLog (
     LogID INT AUTO_INCREMENT PRIMARY KEY,
     UserID INT NOT NULL,
@@ -459,9 +476,20 @@ CREATE TABLE ReportAccessLog (
     AccessDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     RetentionExpiryDate DATETIME GENERATED ALWAYS AS (DATE_ADD(AccessDate, INTERVAL 90 DAY)) STORED
 );
--- Evento schedulato in MySQL per la cancellazione automatica dei log vecchi (es. > 90 giorni)
-CREATE EVENT purge_old_access_logs
-ON SCHEDULE EVERY 1 DAY
-DO
-  DELETE FROM ReportAccessLog 
-  WHERE AccessDate < NOW() - INTERVAL 90 DAY;
+
+-- Verifico la struttura
+
+describe ReportAccessLog;
+
+-- Inserisco valori di accesso di esempio
+
+INSERT INTO ReportAccessLog (UserID, AccessDate)
+VALUES
+    (101, '2026-09-15 09:15:00'),
+    (102, '2026-09-16 10:30:00'),
+    (103, '2026-09-17 14:45:00'),
+    (101, '2026-09-18 08:20:00'),
+    (104, '2026-09-18 16:10:00'),
+    (105, '2026-09-19 07:05:00');
+SELECT *
+	FROM ReportAccessLog;
